@@ -1,49 +1,49 @@
 # CodingAgent
 
-En liten, granskningsstyrd kodagent för Git- och GitHub-repositories. Agenten
-använder OpenAI Responses API med din egen API-nyckel och är därför oberoende av
-Codex-abonnemangets användningsgränser.
+A small, approval-gated coding agent for Git and GitHub repositories. The agent
+uses the OpenAI Responses API with your own API key and is therefore independent
+of Codex subscription usage limits.
 
-Den här versionen är en vidareutveckling av den tidigare `agent.py` och behåller
-ett enkelt terminalgränssnitt. Den viktigaste principen är:
+This version is an evolution of the original `agent.py` and keeps a simple
+terminal interface. The most important principle is:
 
-> Modellen får föreslå och skriva kod, men den kan inte själv kringgå
-> godkännanden, lämna worktreen, commit:a till en skyddad branch, push:a eller
-> skapa/merga pull requests.
+> The model may propose and write code, but it cannot bypass approvals, leave
+> the worktree, commit to a protected branch, push, or create/merge pull
+> requests on its own.
 
-## Funktioner
+## Features
 
-- Automatisk branch och isolerad `git worktree` per uppgift.
-- GitHub Issues via `gh` (beskrivning, kommentarer, labels, acceptance criteria,
-  beroenden till issues/PRs).
-- Plan presenteras och kräver godkännande innan någon fil ändras.
-- Varje filskrivning visas som en diff och kräver godkännande.
-- Tester körs i en separat Docker-container: icke-root, utan nätverk,
-  resursbegränsad och utan värdens hemkatalog, Docker-socket, SSH-nycklar eller
-  API-nycklar.
-- Automatisk commit endast efter att testerna har passerat.
-- Push och draft-PR kräver uttryckligt godkännande. Ingen automatisk merge och
-  inga automatiska issue-stängningar.
-- Kostnadskontroll per uppgift med `--max-cost`, tokenräkning, cached tokens,
-  lokal JSONL-logg och konfigurerbar, versionshanterad prislista.
-- `--dry-run` för analys och plan utan branches, worktrees, filändringar,
-  commits, kostnadslogg eller PRs.
+- Automatic branch and isolated `git worktree` for every task.
+- GitHub Issues via `gh` (description, comments, labels, acceptance criteria,
+  dependencies on issues/PRs).
+- A plan is presented and requires approval before any file is changed.
+- Every file write is shown as a diff and requires approval.
+- Tests run in a separate Docker container: non-root, no network, resource
+  limited, and without the host home directory, Docker socket, SSH keys or API
+  keys.
+- Automatic commit only after tests pass.
+- Push and draft PR require explicit approval. There is no automatic merge and
+  no automatic issue closing.
+- Per-task cost control with `--max-cost`, token accounting, cached tokens, a
+  local JSONL log and a configurable, versioned pricing file.
+- `--dry-run` for analysis and planning without branches, worktrees, file
+  changes, commits, cost logs or PRs.
 
-## Krav
+## Requirements
 
-- macOS (Linux fungerar i huvudsak också).
-- Python 3.11 eller senare.
+- macOS (Linux largely works too).
+- Python 3.11 or later.
 - Git.
-- Docker Desktop (eller Docker Engine) med en körande daemon.
+- Docker Desktop (or Docker Engine) with a running daemon.
 - GitHub CLI, `gh`.
-- En OpenAI API-nyckel med tillgång till Responses API.
+- An OpenAI API key with access to the Responses API.
 
-Agenten använder **inte** Codex CLI eller Codex-abonnemanget. API-anropen
-debiteras separat enligt OpenAI:s API-priser.
+The agent does **not** use the Codex CLI or the Codex subscription. API calls
+are billed separately according to OpenAI's API prices.
 
-## Installation på macOS
+## macOS installation
 
-### 1. Systemverktyg
+### 1. System tools
 
 ```bash
 brew install python@3.12 git gh
@@ -51,7 +51,7 @@ brew install --cask docker
 open -a Docker
 ```
 
-Vänta tills Docker Desktop har startat och verifiera:
+Wait until Docker Desktop has started, then verify:
 
 ```bash
 docker info
@@ -59,7 +59,7 @@ gh --version
 git --version
 ```
 
-### 2. Python-miljö
+### 2. Python environment
 
 ```bash
 cd ~/ai-coding-agent
@@ -69,18 +69,18 @@ python -m pip install --upgrade pip
 pip install -r requirements-dev.txt
 ```
 
-`requirements-dev.txt` innehåller även pytest. Om du vill kunna starta agenten
-som ett kommando kan du dessutom köra:
+`requirements-dev.txt` also includes pytest. If you want to start the agent as
+a command, you can additionally run:
 
 ```bash
 pip install -e .
 ai-coding-agent --help
 ```
 
-Det enklaste är annars att alltid köra `python agent.py ...` från
-`~/ai-coding-agent` med den virtuella miljön aktiverad.
+Otherwise, the simplest approach is to always run `python agent.py ...` from
+`~/ai-coding-agent` with the virtual environment activated.
 
-### 3. GitHub CLI och repository
+### 3. GitHub CLI and repository
 
 ```bash
 gh auth login
@@ -88,41 +88,41 @@ gh auth status
 git -C /path/to/ProjectA remote -v
 ```
 
-Det måste finnas en remote som heter `origin`, och `gh` måste vara autentiserad
-mot den GitHub-instans som repositoryt tillhör. Agenten återanvänder befintlig
-`gh auth` och frågar aldrig efter en GitHub-token i terminalen.
+There must be a remote named `origin`, and `gh` must be authenticated against
+the GitHub instance that hosts the repository. The agent reuses your existing
+`gh auth` and never asks for a GitHub token in the terminal.
 
-Vid issue-baserat arbete krävs att repositoryt har en GitHub-origin. Agenten
-vägrar arbeta mot enbart en lokal katalog.
+Issue-based work requires the repository to have a GitHub origin. The agent
+refuses to work against a local-only directory.
 
 ### 4. OpenAI API
 
 ```bash
 export OPENAI_API_KEY="sk-..."
-# Valfritt:
+# Optional:
 export OPENAI_MODEL="gpt-5.4"
 ```
 
-Sätt aldrig nyckeln i repositoryt. Agenten läser den från miljön, skickar den
-inte vidare till Docker-containern och skriver den inte till loggar. Den läser
-inte `.env` automatiskt.
+Never put the key in the repository. The agent reads it from the environment,
+does not pass it to the Docker container, and does not write it to logs. It does
+not load `.env` automatically.
 
-**Datadelning:** filer, issuebeskrivningar och kommentarer som modellen läser
-skickas till OpenAI Responses API som en del av prompten. Agenten använder
-`store=False`, men det är inte en garanti för hur leverantören hanterar data
-efter anropet. Följ din organisations policy innan du kör agenten mot privat
-eller känslig kod.
+**Data sharing:** files, issue descriptions and comments that the model reads
+are sent to the OpenAI Responses API as part of the prompt. The agent uses
+`store=False`, but that is not a guarantee of how the provider handles data
+after the request. Follow your organization's policy before running the agent
+against private or sensitive code.
 
-Kontrollera:
+Verify:
 
 ```bash
 python agent.py --version
 python agent.py --help
 ```
 
-## Snabbstart
+## Quick start
 
-### Analysläge utan sidoeffekter
+### Analysis mode without side effects
 
 ```bash
 cd ~/ai-coding-agent
@@ -130,16 +130,16 @@ source .venv/bin/activate
 python agent.py ~/Projects/ProjectA --issue 963 --dry-run
 ```
 
-I dry-run:
+In a dry run:
 
-- läses repositoryt och GitHub-issuen,
-- ingen Docker krävs,
-- ingen branch eller worktree skapas,
-- inga filer, commits eller PRs skapas,
-- ingen kostnadslogg skrivs (kostnaden visas bara i terminalen),
-- inget godkännande begärs.
+- the repository and GitHub issue are read,
+- Docker is not required,
+- no branch or worktree is created,
+- no files, commits or PRs are created,
+- no cost log is written (cost is shown only in the terminal),
+- no approval is requested.
 
-### Issue-baserad utveckling: ProjectA
+### Issue-based development: ProjectA
 
 ```bash
 python agent.py ~/Projects/ProjectA \
@@ -149,7 +149,7 @@ python agent.py ~/Projects/ProjectA \
   --reasoning-effort medium
 ```
 
-### Issue-baserad utveckling: ProjectB
+### Issue-based development: ProjectB
 
 ```bash
 python agent.py ~/Projects/ProjectB \
@@ -158,73 +158,73 @@ python agent.py ~/Projects/ProjectB \
   --max-cost 2.00
 ```
 
-`ProjectA` och `ProjectB` är neutrala exempel. Byt ut dem och exempelvägarna mot
-dina faktiska repositories. Ange `--base-branch` om repositoryts standardbranch
-inte kan identifieras automatiskt.
+`ProjectA` and `ProjectB` are neutral examples. Replace them and the example
+paths with your actual repositories. Specify `--base-branch` if the
+repository's default branch cannot be detected automatically.
 
-### Fri uppgift utan issue
+### Free-form task without an issue
 
 ```bash
 python agent.py ~/Projects/ProjectB \
-  "Lägg till validering av tomt organisationsnummer och uppdatera testerna" \
+  "Add validation for empty organization numbers and update the tests" \
   --max-cost 1.50
 ```
 
-## Arbetsflöde och godkännanden
+## Workflow and approvals
 
-1. **Förkontroll**: Git-repository, Docker, GitHub CLI/autentisering och
-   OpenAI-konfiguration verifieras. Modellpriset måste vara känt.
-2. **Issue-analys**: Issue, kommentarer, labels, acceptance criteria och
-   refererade issues/PRs hämtas. Innehållet behandlas som opålitlig indata.
-3. **Plan**: Agenten undersöker kod och tester och presenterar en konkret plan.
-4. **Godkännande av plan**: Inga filer ändras innan du svarar `y`.
-5. **Isolerad worktree**: En ny branch skapas, till exempel
-   `agent/issue-963-fix-login`, i en worktree utanför din vanliga arbetskopia.
-6. **Kodändringar**: Varje `write_file` visar en diff och kräver ett separat
-   godkännande.
-7. **Tester**: Relevanta tester kan köras under arbetet. Efter avslutat arbete
-   kör agenten alltid hela testsviten i Docker.
-8. **Resultat**: Testresultat, filstatus och diff-statistik visas. Om testerna
-   misslyckas görs **ingen commit** och ändringarna ligger kvar i worktreen.
-9. **Commit**: Om testerna passerar skapas en automatisk commit med
-   `Refs #<issue>` (aldrig `Fixes`/`Closes`) och en sammanfattning.
-10. **Push/PR**: Agenten visar förslag på draft-PR (titel och beskrivning) och
-    begär uttryckligt godkännande. Först därefter pushas branchen och en
-    **draft**-PR skapas.
-11. **Slutrapport**: Branch, commit, worktree, tester, kostnad och eventuell
-    PR-länk visas.
+1. **Preflight**: the Git repository, Docker, GitHub CLI/authentication and
+   OpenAI configuration are verified. The model price must be known.
+2. **Issue analysis**: the issue, comments, labels, acceptance criteria and
+   referenced issues/PRs are fetched. The content is treated as untrusted input.
+3. **Plan**: the agent examines code and tests and presents a concrete plan.
+4. **Plan approval**: no files are changed until you answer `y`.
+5. **Isolated worktree**: a new branch is created, for example
+   `agent/issue-963-fix-login`, in a worktree outside your regular working copy.
+6. **Code changes**: every `write_file` displays a diff and requires a separate
+   approval.
+7. **Tests**: relevant tests can be run during the work. When the work is
+   finished, the agent always runs the full test suite in Docker.
+8. **Results**: test results, file status and diff statistics are shown. If tests
+   fail, **no commit** is made and the changes remain in the worktree.
+9. **Commit**: if tests pass, an automatic commit is created with
+   `Refs #<issue>` (never `Fixes`/`Closes`) and a summary.
+10. **Push/PR**: the agent shows a proposed draft PR (title and description) and
+    asks for explicit approval. Only then is the branch pushed and a **draft**
+    PR created.
+11. **Final report**: branch, commit, worktree, tests, cost and any PR link are
+    displayed.
 
-Agenten kör aldrig `gh pr merge`, `gh issue close` eller motsvarande. En merge
-måste göras manuellt av en människa.
+The agent never runs `gh pr merge`, `gh issue close` or equivalent commands. A
+merge must be performed manually by a human.
 
-## Git, branches och worktrees
+## Git, branches and worktrees
 
-- Branchformat: `agent/issue-<nummer>-<kort-slug>`, till exempel
+- Branch format: `agent/issue-<number>-<short-slug>`, for example
   `agent/issue-963-fix-login`.
-- Om namnet redan finns läggs ett unikt suffix till (`-2`, `-3`, ...).
-- Worktrees skapas som standard under:
+- If the name already exists, a unique suffix is added (`-2`, `-3`, ...).
+- Worktrees are created by default under:
   `~/.local/state/ai-coding-agent/worktrees/<repo>-<hash>/<branch>`.
-- Använd `--worktree-root` för att välja en annan katalog.
-- Din ordinarie arbetskopia checkas aldrig ut till agentbranchen och dess
-  branch/HEAD ändras inte. Detta verifieras före och efter arbetet.
-- Agenten vägrar skriva eller commit:a på `main`, `master`, base-branchen eller
-  andra brancher som inte börjar med `agent/`.
-- Endast filer som agenten faktiskt har skrivit stageas. Filnamn som `.env`,
-  `.env.*` (utom tydliga mallar som `.env.example`), `*.pem`, `*.key`,
-  credentials-filer, SSH-nycklar och liknande blockeras.
-- Stageade ändringar skannas efter högkonfidensmönster för hemligheter. Vid
-  träff avbryts commit och index rensas.
-- Git-hooks och GPG-signering stängs av för agentens automatiska commit
-  (`--no-verify`, `commit.gpgsign=false`) så att repository-kod inte körs som en
-  del av commit-processen.
+- Use `--worktree-root` to choose a different directory.
+- Your regular working copy is never checked out to the agent branch, and its
+  branch/HEAD is not changed. This is verified before and after the work.
+- The agent refuses to write or commit on `main`, `master`, the base branch, or
+  any other branch that does not start with `agent/`.
+- Only files the agent actually wrote are staged. Filenames such as `.env`,
+  `.env.*` (except clear templates such as `.env.example`), `*.pem`, `*.key`,
+  credentials files, SSH keys and similar are blocked.
+- Staged changes are scanned for high-confidence secret patterns. On a match,
+  the commit is aborted and the index is reset.
+- Git hooks and GPG signing are disabled for the agent's automatic commit
+  (`--no-verify`, `commit.gpgsign=false`) so that repository code is not
+  executed as part of the commit process.
 
-Om din ordinarie arbetskopia har ocommittade ändringar varnar agenten. Ändringarna
-kopieras inte till worktreen, som utgår från base-branchens HEAD. Committa eller
-stasha gärna innan du startar för att planen ska utgå från exakt samma kod som
-worktreen.
+If your regular working copy has uncommitted changes, the agent warns you. The
+changes are not copied into the worktree, which is based on the HEAD of the base
+branch. It is best to commit or stash before starting so that the plan is based
+on exactly the same code as the worktree.
 
-Worktreen tas inte bort automatiskt, eftersom den kan behövas för granskning
-eller återhämtning. Manuell städning:
+Worktrees are not removed automatically because they may be needed for review
+or recovery. Manual cleanup:
 
 ```bash
 git -C /path/to/repo worktree list
@@ -234,85 +234,87 @@ git -C /path/to/repo branch -D agent/issue-963-fix-login
 
 ## GitHub Issues
 
-För `--issue` hämtar agenten:
+For `--issue`, the agent fetches:
 
-- nummer, titel, body, state och URL,
+- number, title, body, state and URL,
 - labels,
-- kommentarer,
-- försök till extrahering av acceptance criteria från rubriker och checkboxar,
-- referenser till andra issues/PRs (`#123` och fullständiga GitHub-URL:er) och
-  deras titel/state.
+- comments,
+- a best-effort extraction of acceptance criteria from headings and checkboxes,
+- references to other issues/PRs (`#123` and full GitHub URLs) and their
+  title/state.
 
-Extraherade acceptance criteria är en läshjälp, inte ett kontrakt. Issue-text
-och kommentarer är opålitlig indata och får inte styra agentens behörigheter.
+Extracted acceptance criteria are a reading aid, not a contract. Issue text and
+comments are untrusted input and must not control the agent's permissions.
 
-När arbetet är klart föreslår agenten en PR-titel och PR-beskrivning. Efter ditt
-godkännande skapas en **draft-PR** med `gh pr create --draft`. PR-texten rensas
-från stängningsnyckelord som `Closes #123` och använder `Refs #123` i stället.
+When the work is finished, the agent proposes a PR title and PR description.
+After your approval, a **draft PR** is created with `gh pr create --draft`. The PR
+text is stripped of closing keywords such as `Closes #123` and uses
+`Refs #123` instead.
 
-Saknas `gh` eller autentisering får du installationsinstruktioner. Agenten
-försöker inte skapa en egen token eller kringgå `gh auth`.
+If `gh` or authentication is missing, you receive installation instructions. The
+agent does not try to create its own token or bypass `gh auth`.
 
-## Docker-isolerade tester
+## Docker-isolated tests
 
-För varje testkörning:
+For each test run:
 
-1. En sanerad, skrivbar kopia av worktreen skapas i en tillfällig katalog.
-   `.git`, samtliga `.env*`-filer, credentials, nycklar, `.venv`,
-   `node_modules`, `dist`, `build` och liknande kopieras inte. Symboliska länkar
-   hoppas över.
-2. En minimal image byggs från `python:3.12-slim` med pytest. Projektets
-   `requirements.txt`, `requirements-dev.txt` och/eller `pyproject.toml` /
-   `setup.py` installeras vid imagebygget.
-3. Testcontainern körs med:
+1. A sanitized, writable copy of the worktree is created in a temporary
+   directory. `.git`, all `.env*` files, credentials, keys, `.venv`,
+   `node_modules`, `dist`, `build` and similar are not copied. Symbolic links are
+   skipped.
+2. A minimal image is built from `python:3.12-slim` with pytest. The project's
+   `requirements.txt`, `requirements-dev.txt` and/or `pyproject.toml` /
+   `setup.py` are installed during the image build.
+3. The test container runs with:
 
    - `--network none`
-   - `--user <hostens icke-root-UID>` (eller `10001:10001` om agenten körs som
-     root)
-   - `--read-only` med skrivbar worktree-mount och tmpfs för `/tmp`
+   - `--user <host's non-root UID>` (or `10001:10001` if the agent runs as root)
+   - `--read-only` with a writable worktree mount and tmpfs for `/tmp`
    - `--cap-drop ALL`
    - `--security-opt no-new-privileges`
-   - `--cpus`, `--memory`, `--memory-swap`, `--pids-limit` och timeout
-   - endast den sanerade testkopian mountad på `/workspace`
-   - inga `-e`-variabler med API-nycklar, ingen hemkatalog och ingen
-     Docker-socket
+   - `--cpus`, `--memory`, `--memory-swap`, `--pids-limit` and a timeout
+   - only the sanitized test copy mounted at `/workspace`
+   - no `-e` variables containing API keys, no home directory and no Docker
+     socket
 
-4. stdout, stderr och exit code samlas in. Passerade/misslyckade tester och
-   sammanfattning visas.
-5. Container, image och den tillfälliga testkatalogen städas i `finally`.
+4. stdout, stderr and the exit code are collected. Passed/failed tests and a
+   summary are displayed.
+5. The container, image and temporary test directory are cleaned up in
+   `finally`.
 
-Standardgränser:
+Default limits:
 
-| Resurs | Standard |
+| Resource | Default |
 | --- | --- |
 | CPU | 1.0 |
 | RAM | 512 MB |
-| Processer | 128 |
-| Testtimeout | 300 s |
-| Image build-timeout | 600 s |
+| Processes | 128 |
+| Test timeout | 300 s |
+| Image build timeout | 600 s |
 
-Ändra med `--test-cpus`, `--test-memory`, `--test-pids` och `--test-timeout`.
+Change them with `--test-cpus`, `--test-memory`, `--test-pids` and
+`--test-timeout`.
 
-Om Docker saknas eller daemonen inte svarar avbryter agenten med tydliga
-installationsinstruktioner. Den kör **aldrig** tester direkt på värddatorn som
-fallback.
+If Docker is missing or the daemon does not respond, the agent aborts with clear
+installation instructions. It **never** falls back to running tests directly on
+the host.
 
-### Viktig begränsning: imagebygget
+### Important limitation: the image build
 
-Själva testkörningen har inget nätverk. Imagebygget måste däremot kunna nå
-paketindex för att installera pytest och projektets beroenden. `pip install`
-kan köra projektets byggkod (till exempel `setup.py` eller byggbackend) inuti
-byggcontainern. Bygget får inga hemliga miljövariabler, ingen hemkatalog och ingen
-Docker-socket, men har nätverk. Kör därför agenten bara mot repositories du
-litar på. Om du vill undvika beroendeinstallation kan du använda ett projekt
-som inte kräver det, eller anpassa `PytestProfile` i
-`coding_agent/docker_tests.py`.
+The test run itself has no network. The image build, however, must be able to
+reach package indexes to install pytest and the project's dependencies. `pip
+install` may execute the project's build code (for example `setup.py` or a build
+backend) inside the build container. The build receives no secret environment
+variables, no home directory and no Docker socket, but it does have network
+access. Therefore, run the agent only against repositories you trust. If you want
+to avoid dependency installation, use a project that does not require it, or
+customize `PytestProfile` in `coding_agent/docker_tests.py`.
 
-Testprofilen är utbyggbar. `DockerTestRunner` tar emot en `TestProfile`; nya
-profiler för React/TypeScript kan registreras utan att ändra Git-, GitHub- eller
-kostnadsmodulerna. Endast `pytest` är registrerad i den här versionen.
+The test profile is extensible. `DockerTestRunner` accepts a `TestProfile`; new
+profiles for React/TypeScript can be registered without changing the Git,
+GitHub or cost modules. Only `pytest` is registered in this version.
 
-## Kostnadskontroll
+## Cost control
 
 ```bash
 python agent.py ~/Projects/ProjectA \
@@ -322,156 +324,156 @@ python agent.py ~/Projects/ProjectA \
   --reasoning-effort medium
 ```
 
-- Standardtak: **2.00 USD** per uppgift.
-- `--max-cost` måste vara ett positivt decimaltal.
-- `--model` väljer modell. Standard är `OPENAI_MODEL` eller `gpt-5.4`.
-- `--reasoning-effort` skickas bara om modellens prispost deklarerar stöd för
-  det. Annars avbryts körningen före första API-anropet.
-- Före varje API-anrop görs en konservativ worst-case-uppskattning: uppskattade
-  inputtokens (25 % marginal plus request-overhead) och maximalt antal
-  outputtokens. Om uppskattningen skulle överskrida återstående budget görs
-  inget anrop.
-- Efter varje anrop visas input-, cached- och outputtokens samt kostnad och
-  ackumulerad summa.
-- Cached input-tokens räknas som en delmängd av inputtokens och prissätts med
-  cached-priset.
-- Långa kontexter kan ha separat prisnivå (till exempel gpt-5.4 över 272 000
-  inputtokens). Prislistan innehåller sådana nivåer där de är kända.
-- Om API:et inte returnerar usage används den konservativa förhandsuppskattningen
-  och en varning visas.
+- Default limit: **2.00 USD** per task.
+- `--max-cost` must be a positive decimal number.
+- `--model` selects the model. The default is `OPENAI_MODEL` or `gpt-5.4`.
+- `--reasoning-effort` is sent only if the model's pricing entry declares
+  support for it. Otherwise, the run aborts before the first API call.
+- Before every API call, a conservative worst-case estimate is made: estimated
+  input tokens (25% margin plus request overhead) and the maximum number of
+  output tokens. If the estimate would exceed the remaining budget, no call is
+  made.
+- After every call, input, cached and output tokens are shown along with the
+  cost and cumulative total.
+- Cached input tokens are treated as a subset of input tokens and priced at the
+  cached price.
+- Long contexts may have a separate price tier (for example, gpt-5.4 above
+  272,000 input tokens). The pricing file includes such tiers where known.
+- If the API does not return usage, the conservative pre-call estimate is used
+  and a warning is displayed.
 
-### Prislista och versionshantering
+### Pricing and versioning
 
-Priserna ligger i `coding_agent/pricing.json`, inte hårdkodade i Python-koden.
-Filen innehåller:
+Prices live in `coding_agent/pricing.json`, not hardcoded in the Python code.
+The file contains:
 
 - `version`: `2026-10-29`
-- `source`: OpenAI:s officiella prissida
+- `source`: OpenAI's official pricing page
 - `currency`: USD
 - `unit`: per 1M tokens
-- pris per modell samt eventuella long-context- och reasoning-inställningar
+- per-model prices and any long-context and reasoning settings
 
-Okända modeller ger ett tydligt fel och antas **aldrig** kosta noll. Uppdatera
-prislistan manuellt när OpenAI ändrar priser, och höj `version` samt
-`checked_at`. Du kan också peka på en egen fil:
+Unknown models produce a clear error and are **never** assumed to cost zero.
+Update the pricing file manually when OpenAI changes prices, and bump `version`
+and `checked_at`. You can also point to your own file:
 
 ```bash
 python agent.py ... --pricing-file /path/to/pricing.json
 ```
 
-### Kostnadslogg
+### Cost log
 
-Som standard skrivs en JSONL-logg per uppgift under:
+By default, a JSONL log is written per task under:
 
 ```text
 ~/.local/state/ai-coding-agent/costs/
 ```
 
-Loggen innehåller start-/slutposter, modell, prisversion, pre-call-uppskattning
-och faktisk usage-kostnad. Den innehåller **inte** prompttext, filinnehåll eller
-API-nycklar. Filen skapas med behörighet `0600`; nya kataloger skapas med
-`0700`.
-`--cost-log-dir` ändrar platsen, men måste ligga utanför målrepositoryt så att
-agenten inte skriver i din ordinarie arbetskopia. Dry-run skriver ingen
-kostnadslogg.
+The log contains start/end records, model, pricing version, pre-call estimate and
+actual usage cost. It does **not** contain prompt text, file contents or API
+keys. The file is created with permissions `0600`; new directories are created
+with `0700`. `--cost-log-dir` changes the location, but it must be outside the
+target repository so that the agent does not write into your regular working
+copy. A dry run writes no cost log.
 
-### Uppskattad kostnad är inte en garanterad debiteringsgräns
+### Estimated cost is not a guaranteed billing limit
 
-Kostnaden beräknas från API:ets rapporterade tokenusage och den lokala
-prislistan. Det kan skilja sig från OpenAI:s faktiska faktura på grund av
-prisändringar, long-context/prioritetsnivåer, cache-beteende, reasoning-tokens,
-valuta/avgifter eller andra villkor. Kostnaden för ett pågående API-anrop är
-inte känd i förväg. `--max-cost` är därför en **konservativ klient-side guard**,
-inte en garanterad debiteringsgräns. Om ett anrop ändå går över taket stoppas
-alla efterföljande anrop.
+The cost is calculated from the token usage reported by the API and the local
+pricing file. It may differ from OpenAI's actual invoice because of price
+changes, long-context/priority tiers, caching behavior, reasoning tokens,
+currency/fees or other terms. The cost of an in-flight API request is not known
+in advance. `--max-cost` is therefore a **conservative client-side guard**, not
+a guaranteed billing limit. If a request still goes over the limit, all
+subsequent requests are stopped.
 
-## CLI-referens
+## CLI reference
 
-| Flagga | Beskrivning |
+| Flag | Description |
 | --- | --- |
-| `repo` | Sökväg till Git-repositoryt |
-| `task ...` | Fri uppgift (valfri om `--issue` anges) |
-| `--issue N` | GitHub-issue att arbeta med |
-| `--dry-run` | Endast analys/plan, inga sidoeffekter |
-| `--model` | OpenAI-modell (standard `gpt-5.4` eller `OPENAI_MODEL`) |
-| `--max-cost USD` | Kostnadstak, standard 2.00 |
+| `repo` | Path to the Git repository |
+| `task ...` | Free-form task (optional when `--issue` is supplied) |
+| `--issue N` | GitHub issue to work on |
+| `--dry-run` | Analysis/plan only, no side effects |
+| `--model` | OpenAI model (default `gpt-5.4` or `OPENAI_MODEL`) |
+| `--max-cost USD` | Cost limit, default 2.00 |
 | `--reasoning-effort` | `none`, `minimal`, `low`, `medium`, `high`, `xhigh` |
-| `--pricing-file` | Egen versionshanterad prislista |
-| `--base-branch` | Base-branch för agentbranchen |
-| `--worktree-root` | Katalog för worktrees |
-| `--cost-log-dir` | Katalog för kostnadsloggar |
-| `--test-timeout` | Testtimeout i sekunder (standard 300) |
-| `--test-cpus` | CPU-gräns (standard 1.0) |
-| `--test-memory` | Minnesgräns (standard 512m) |
-| `--test-pids` | Processgräns (standard 128) |
-| `--test-profile` | Testprofil, för närvarande `pytest` |
+| `--pricing-file` | Custom versioned pricing file |
+| `--base-branch` | Base branch for the agent branch |
+| `--worktree-root` | Directory for worktrees |
+| `--cost-log-dir` | Directory for cost logs |
+| `--test-timeout` | Test timeout in seconds (default 300) |
+| `--test-cpus` | CPU limit (default 1.0) |
+| `--test-memory` | Memory limit (default 512m) |
+| `--test-pids` | Process limit (default 128) |
+| `--test-profile` | Test profile, currently `pytest` |
 | `--version` | Version |
 
-Det finns medvetet inga flaggor för att automatiskt godkänna plan, filskrivning,
-push eller PR. Godkännanden sker interaktivt.
+There are deliberately no flags to automatically approve a plan, file write,
+push or PR. Approvals happen interactively.
 
-## Säkerhet och kända begränsningar
+## Security and known limitations
 
-### Skyddsåtgärder
+### Safeguards
 
-- Endast uttryckligen definierade verktyg: `list_files`, `read_file`,
-  `search_code`, `git_status`, `write_file`, `run_tests`, `submit_summary`.
-  Inget generellt shellverktyg.
-- Alla externa kommandon körs med argumentlistor, aldrig `shell=True`.
-- Sökvägar normaliseras och måste ligga inom worktreen. Path traversal,
-  symlink-escape och känsliga filnamn blockeras.
-- Filskrivningar kräver godkännande och får bara ske på `agent/`-brancher.
-- Repository-, issue- och kommentarsinnehåll behandlas som opålitlig indata i
-  systemprompten. Modellgenererad text kan inte godkänna sig själv.
-- Terminalutskrifter saneras från ANSI/control-tecken och kända hemligheter.
-- Git- och gh-subprocesser får inte OpenAI-nyckeln i sin miljö. Docker får inga
-  hemliga miljövariabler alls.
-- Commit-hooks och GPG-signering stängs av för agentens commit.
-- Push kräver godkännande; PR skapas som draft; merge/close finns inte i
-  kodbasen.
-- Inga automatiska commits vid testfel eller avbruten körning.
+- Only explicitly defined tools: `list_files`, `read_file`, `search_code`,
+  `git_status`, `write_file`, `run_tests`, `submit_summary`. There is no general
+  shell tool.
+- All external commands run with argument lists, never `shell=True`.
+- Paths are normalized and must remain inside the worktree. Path traversal,
+  symlink escapes and sensitive filenames are blocked.
+- File writes require approval and may only happen on `agent/` branches.
+- Repository, issue and comment content is treated as untrusted input in the
+  system prompt. Model-generated text cannot approve itself.
+- Terminal output is sanitized for ANSI/control characters and known secrets.
+- Git and gh subprocesses do not receive the OpenAI key in their environment.
+  Docker receives no secret environment variables at all.
+- Git hooks and GPG signing are disabled for the agent's commit.
+- Push requires approval; PRs are created as drafts; merge/close functionality
+  does not exist in the codebase.
+- No automatic commits on test failure or interrupted runs.
 
-### Begränsningar du måste känna till
+### Limitations you need to know
 
-- **Docker image build har nätverk** och installerar projektberoenden. Det är
-  nödvändigt för att kunna köra tester men innebär att projektets byggkod körs i
-  byggcontainern. Använd betrodda repositories.
-- **Testkoden kan läsa hela den sanerade projektkopian.** Den kan inte se
-  värdens hemkatalog, Docker-socket, SSH-nycklar eller miljövariabler med
-  API-nycklar, men kan försöka exfiltrera projektets egen källkod om den har
-  nätverk. Testkörningen har `--network none`, men imagebygget har nätverk.
-  Detta förutsätter också att hemligheter inte har checkats in i vanliga
-  projektfiler; agenten blockerar kända filnamn och mönster men kan inte göra
-  anspråk på att hitta varje möjlig hemlighet.
-- **Docker-daemonen är betrodd.** Agenten monterar inte socketen, men en
-  användare som kan köra Docker på värden har ändå stora befogenheter.
-- **Prompt injection kan påverka modellens förslag** och slösa API-budget, men
-  kan inte kringgå de hårda godkännandena, verktygslistan, worktree-gränsen,
-  Docker-isoleringen eller push/PR-spärrarna.
-- **Kostnadstaket är inte faktureringsgaranti** (se ovan). Ett pågående anrop
-  kan kosta mer än uppskattningen.
-- **Modellen kan göra felaktiga ändringar.** Granska diffen och testerna innan
-  du pushar eller mergar.
-- **Docker build-cache kan behålla lager** från den tillfälliga testkopian även
-  efter att image-taggen tagits bort. Rensa vid behov med `docker builder prune`;
-  det påverkar även andra Docker-byggen på maskinen.
-- **Worktrees ligger kvar** efter körningen och kan behöva städas manuellt.
-- **Python 3.12 + pytest** är den enda färdiga testprofilen. React/TypeScript
-  kräver en framtida `TestProfile`.
-- **Repositories med enbart `pyproject.toml`** kan behöva ett fungerande
-  byggbackend och Python-versionen i testimagen. Saknade systembibliotek ger ett
-  tydligt Docker-build-fel; lägg då till dem i projektets miljö eller anpassa
-  profilen.
-- **Base-branchen kan vara äldre än `origin`.** Agenten gör ingen automatisk
-  `git fetch`; kör det själv om du vill utgå från senaste remote-commit.
-- **Ingen automatisk återupptagning.** Efter avbrott visas worktree och branch;
-  du kan fortsätta manuellt eller köra en ny uppgift.
+- **The Docker image build has network access** and installs project
+  dependencies. This is necessary to run tests, but it means the project's build
+  code runs in the build container. Use trusted repositories.
+- **Test code can read the entire sanitized project copy.** It cannot see the
+  host home directory, Docker socket, SSH keys or environment variables
+  containing API keys, but it may attempt to exfiltrate the project's own source
+  code if it has network access. The test run uses `--network none`, but the
+  image build has network access. This also assumes secrets have not been
+  committed in ordinary project files; the agent blocks known filenames and
+  patterns but cannot claim to find every possible secret.
+- **The Docker daemon is trusted.** The agent does not mount the socket, but a
+  user who can run Docker on the host still has broad powers.
+- **Prompt injection can influence the model's suggestions** and waste API
+  budget, but cannot bypass the hard approvals, tool allowlist, worktree
+  boundary, Docker isolation or push/PR gates.
+- **The cost limit is not a billing guarantee** (see above). An in-flight request
+  may cost more than the estimate.
+- **The model can make incorrect changes.** Review the diff and tests before
+  pushing or merging.
+- **The Docker build cache may retain layers** from the temporary test copy even
+  after the image tag is removed. Clean up if needed with `docker builder prune`;
+  this also affects other Docker builds on the machine.
+- **Worktrees remain after the run** and may need manual cleanup.
+- **Python 3.12 + pytest** is the only completed test profile. React/TypeScript
+  requires a future `TestProfile`.
+- **Repositories with only `pyproject.toml`** may need a working build backend
+  and the Python version used in the test image. Missing system libraries produce
+  a clear Docker build error; add them to the project environment or customize
+  the profile.
+- **The base branch may be older than `origin`.** The agent does not run an
+  automatic `git fetch`; run it yourself if you want to start from the latest
+  remote commit.
+- **No automatic resume.** After an interruption, the worktree and branch are
+  shown; you can continue manually or run a new task.
 
-## Felsökning
+## Troubleshooting
 
 ### `Not a valid Git working tree`
 
-Kontrollera att sökvägen finns och är ett Git-repository:
+Check that the path exists and is a Git repository:
 
 ```bash
 git -C /path/to/repo rev-parse --show-toplevel
@@ -491,9 +493,9 @@ gh auth status
 gh auth login
 ```
 
-Agenten använder din befintliga `gh`-autentisering och lagrar inga tokens själv.
+The agent uses your existing `gh` authentication and stores no tokens itself.
 
-### `Docker was not found` eller `daemon is not available`
+### `Docker was not found` or `daemon is not available`
 
 ```bash
 brew install --cask docker
@@ -501,58 +503,59 @@ open -a Docker
 docker info
 ```
 
-Agenten faller aldrig tillbaka på att köra tester på värddatorn.
+The agent never falls back to running tests on the host.
 
 ### Docker image build failed
 
-Vanliga orsaker:
+Common causes:
 
-- projektets beroenden kräver systempaket som inte finns i `python:3.12-slim`,
-- `pyproject.toml` kräver en annan Python-version eller byggbackend,
-- nätverket når inte paketindex.
+- the project's dependencies require system packages that are not present in
+  `python:3.12-slim`,
+- `pyproject.toml` requires a different Python version or build backend,
+- the network cannot reach the package index.
 
-Byggfelet visas i terminalen. Ändringarna ligger kvar i worktreen och ingen
-commit görs.
+The build error is shown in the terminal. The changes remain in the worktree and
+no commit is made.
 
 ### `No tests collected` / pytest exit code 5
 
-Agenten kräver minst ett passerat test för att automatiskt committa. Lägg till
-tester eller kör en annan testprofil när sådan finns.
+The agent requires at least one passing test to commit automatically. Add tests
+or use another test profile when one is available.
 
 ### `No pricing is configured for model ...`
 
-Lägg till modellen i `coding_agent/pricing.json` med version, källa och pris,
-eller använd en modell som finns i prislistan. Okända priser antas aldrig vara
-noll.
+Add the model to `coding_agent/pricing.json` with version, source and price, or
+use a model that is already in the pricing file. Unknown prices are never
+assumed to be zero.
 
 ### `Cost limit reached` / `would exceed the remaining budget`
 
-Höj `--max-cost` eller använd en billigare modell. Meddelandet är en
-konservativ skyddsgräns, inte en faktureringsgaranti.
+Increase `--max-cost` or use a cheaper model. The message is a conservative
+guard, not a billing guarantee.
 
 ### `Git author identity is not configured`
 
 ```bash
-git config --global user.name "Ditt Namn"
-git config --global user.email "du@example.com"
+git config --global user.name "Your Name"
+git config --global user.email "you@example.com"
 ```
 
-### `uncommitted changes` i källarbetskopian
+### `uncommitted changes` in the source working copy
 
-Agenten varnar och worktreen utgår från HEAD, inte från de ocommittade
-ändringarna. Committa eller stasha innan du kör för bästa resultat.
+The agent warns and the worktree is based on HEAD, not the uncommitted changes.
+Commit or stash before running for the best results.
 
-### `ModuleNotFoundError: coding_agent` när du kör pytest
+### `ModuleNotFoundError: coding_agent` when running pytest
 
-Kör från repositoryroten med:
+Run from the repository root with:
 
 ```bash
 python -m pytest -q
 ```
 
-### Push/PR misslyckas
+### Push/PR fails
 
-Kontrollera:
+Check:
 
 ```bash
 git -C /path/to/repo remote -v
@@ -560,16 +563,16 @@ gh auth status
 git -C /path/to/worktree status
 ```
 
-Commiten och worktreen finns kvar även om push eller PR misslyckas. Ingen merge
-eller issue-stängning görs av agenten.
+The commit and worktree remain even if push or PR creation fails. The agent does
+not merge or close issues.
 
-## Tester
+## Tests
 
-Enhetstesterna mockar OpenAI- och GitHub-anrop. Det finns även ett lokalt
-Git-integrationstest och ett riktigt Docker-test som verifierar att containern
-kör som icke-root, saknar nätverk, inte får `OPENAI_API_KEY` och inte kan skriva
-i originalrepositoryt. Kommandoargumenten verifieras dessutom för att ingen
-hemkatalog, Docker-socket eller hemlig miljövariabel monteras.
+Unit tests mock OpenAI and GitHub calls. There is also a local Git integration
+test and a real Docker test that verifies the container runs as non-root, has no
+network, does not receive `OPENAI_API_KEY`, and cannot write to the original
+repository. Command arguments are also verified to ensure no home directory,
+Docker socket or secret environment variable is mounted.
 
 ```bash
 source .venv/bin/activate
@@ -577,32 +580,32 @@ python -m pytest -q
 python -m pytest -q -m docker
 ```
 
-Docker-testet hoppas över automatiskt om Docker saknas. Inga riktiga
-OpenAI-anrop görs i testsviten; en riktig API-körning kräver din
+The Docker test is skipped automatically if Docker is not available. No real
+OpenAI calls are made in the test suite; a real API run requires your
 `OPENAI_API_KEY`.
 
-## Arkitektur
+## Architecture
 
-Se [ARCHITECTURE.md](ARCHITECTURE.md) för moduluppdelning, dataflöde,
-säkerhetsinvariants och utbyggnad av testprofiler.
+See [ARCHITECTURE.md](ARCHITECTURE.md) for module layout, data flow, security
+invariants and test profile extensions.
 
-## Licens
+## License
 
-MIT, se [LICENSE](LICENSE).
+MIT, see [LICENSE](LICENSE).
 
-## Säkerhetsrapportering
+## Security reporting
 
-Se [SECURITY.md](SECURITY.md). Rapportera säkerhetsproblem via GitHub:s privata
-säkerhetsrapportering, inte som ett öppet issue.
+See [SECURITY.md](SECURITY.md). Report security issues through GitHub's private
+vulnerability reporting, not as a public issue.
 
-## Manuella installationssteg
+## Manual installation steps
 
-Agenten installerar inte systemverktyg eller skapar autentisering åt dig. Följ
-därför:
+The agent does not install system tools or create authentication for you.
+Therefore:
 
-1. Installera Git, Python 3.12, Docker Desktop och `gh` enligt ovan.
-2. Starta Docker Desktop och verifiera `docker info`.
-3. Kör `gh auth login` och säkerställ att repositoryt har en `origin`.
-4. Sätt `OPENAI_API_KEY` i aktuell shell.
-5. Kör `pip install -r requirements-dev.txt`.
-6. Börja med `--dry-run` för att granska planen utan sidoeffekter.
+1. Install Git, Python 3.12, Docker Desktop and `gh` as described above.
+2. Start Docker Desktop and verify with `docker info`.
+3. Run `gh auth login` and make sure the repository has an `origin`.
+4. Set `OPENAI_API_KEY` in the current shell.
+5. Run `pip install -r requirements-dev.txt`.
+6. Start with `--dry-run` to review the plan without side effects.
